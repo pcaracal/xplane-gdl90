@@ -23,7 +23,7 @@ use xplm_egui::{
     flight_loop::FlightLoop,
     geometry::ScreenRect,
     menu::{ActionItem, Menu, MenuClickHandler},
-    plugin::{Plugin, PluginInfo},
+    plugin::{Plugin, PluginInfo, reload_plugins},
     xplane_plugin,
 };
 
@@ -37,6 +37,7 @@ pub const PLUGIN_FOLDER: &str = "xplane-gdl90";
 struct GDL90Plugin {
     #[allow(unused)]
     menu: Menu,
+    state: Rc<State>,
     flight_loop: Rc<RefCell<FlightLoop>>,
 }
 
@@ -61,6 +62,7 @@ impl Plugin for GDL90Plugin {
 
         let state = Rc::new(State::load());
         let socket = Socket::new()?;
+        socket.set_target(state.target.get());
 
         let datarefs = Rc::new(Datarefs::new()?);
         let flight_loop = Rc::new(RefCell::new(FlightLoop::new(FlightLoopHandler::new(
@@ -72,20 +74,31 @@ impl Plugin for GDL90Plugin {
         menu.add_child(ActionItem::new(
             "Toggle window",
             ToggleWindow::Uninitialized {
-                state,
+                state: state.clone(),
                 datarefs,
                 flight_loop: flight_loop.clone(),
                 socket,
             },
         )?);
+        menu.add_child(ActionItem::new("Reload Plugins", |_: &ActionItem| {
+            warn!("Reloading plugins...");
+            reload_plugins();
+        })?);
         menu.add_to_plugins_menu();
 
-        Ok(GDL90Plugin { menu, flight_loop })
+        Ok(GDL90Plugin {
+            menu,
+            state,
+            flight_loop,
+        })
     }
 
     fn enable(&mut self) -> Result<(), Self::Error> {
         info!("Enabling plugin");
-        self.flight_loop.borrow_mut().schedule_immediate();
+
+        self.flight_loop
+            .borrow_mut()
+            .schedule_after(self.state.interval.get().max(State::MINIMUM_INTERVAL));
 
         Ok(())
     }

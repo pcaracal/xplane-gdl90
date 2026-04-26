@@ -17,8 +17,7 @@ pub struct Socket {
 impl Socket {
     pub fn new() -> anyhow::Result<Self> {
         let socket = Rc::new(UdpSocket::bind("0.0.0.0:0")?);
-        socket.set_nonblocking(true)?;
-        socket.set_broadcast(true)?;
+        // socket.set_nonblocking(true)?;
         Ok(Self {
             socket,
             target: Rc::default(),
@@ -63,7 +62,17 @@ impl Socket {
         bytes.extend_from_slice(&ownship.into_gdl90_bytes()?);
         bytes.extend_from_slice(&ahrs.into_gdl90_bytes()?);
 
+        if !self.socket.broadcast()? {
+            self.socket.set_broadcast(true)?;
+            debug!("Enabled broadcast on socket");
+        }
         self.socket.send_to(&bytes, target)?;
+
+        match self.socket.take_error() {
+            Ok(Some(error)) => error!("UdpSocket error: {error:?}"),
+            Ok(None) => (),
+            Err(error) => error!("UdpSocket.take_error failed: {error:?}"),
+        }
 
         Ok(())
     }
