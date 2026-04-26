@@ -9,7 +9,14 @@ use uom::{
 };
 use xplm_egui::{egui_window::App, flight_loop::FlightLoop};
 
-use crate::{data::Datarefs, fmt_uom, socket::Socket, state::State, util::DurationExt};
+use crate::{
+    data::Datarefs,
+    dataref_viewer::DatarefViewer,
+    fmt_uom,
+    socket::Socket,
+    state::{State, UiTab},
+    util::DurationExt,
+};
 
 #[allow(unused)]
 #[derive(Builder)]
@@ -21,6 +28,9 @@ pub struct EguiApp {
 
     #[builder(skip)]
     input: Input,
+
+    #[builder(skip)]
+    dataref_viewer: DatarefViewer,
 }
 
 #[derive(Default)]
@@ -56,11 +66,33 @@ impl App for EguiApp {
         } else {
             None
         };
+        let mut old_tab = self.state.tab.get();
         let mut old_target = self.state.target.get();
         let mut old_interval = self.state.interval.get();
 
         egui::CentralPanel::default_margins().show_inside(ui, |ui| {
             ui.vertical(|ui| {
+                ui.with_layout(
+                    egui::Layout::left_to_right(egui::Align::TOP)
+                        .with_cross_justify(false)
+                        .with_main_wrap(false),
+                    |ui| {
+                        for tab in [UiTab::Config, UiTab::DatarefViewer] {
+                            if ui
+                                .selectable_label(old_tab == tab, format!("{tab:?}"))
+                                .clicked()
+                            {
+                                old_tab = self.state.tab.replace(tab);
+                            }
+                        }
+                    },
+                );
+
+                if self.state.tab.get() == UiTab::DatarefViewer {
+                    self.dataref_viewer.ui(ui, &self.state);
+                    return;
+                }
+
                 ui.horizontal_wrapped(|ui| {
                     if egui::TextEdit::singleline(&mut self.input.target)
                         .hint_text("192.168.1.1:4000")
@@ -187,9 +219,10 @@ impl App for EguiApp {
             });
         });
 
+        let tab = old_tab != self.state.tab.get();
         let t = old_target != self.state.target.get();
         let i = old_interval != self.state.interval.get();
-        if t || i {
+        if tab || t || i {
             if t {
                 self.socket.set_target(self.state.target.get());
             }

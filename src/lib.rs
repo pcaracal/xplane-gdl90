@@ -3,6 +3,7 @@
 
 mod app;
 mod data;
+mod dataref_viewer;
 mod flight_loop;
 mod socket;
 mod state;

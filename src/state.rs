@@ -13,6 +13,15 @@ pub struct State {
     pub target: Cell<Option<SocketAddr>>,
     #[builder(skip(ctor), default = Self::DEFAULT_INTERVAL.into())]
     pub interval: Cell<Duration>,
+    #[builder(skip(ctor))]
+    pub tab: Cell<UiTab>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UiTab {
+    #[default]
+    Config,
+    DatarefViewer,
 }
 
 impl State {

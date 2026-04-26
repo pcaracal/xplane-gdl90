@@ -1509,6 +1509,7 @@ name = "xplane-gdl90"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bitflags",
  "egui",
  "egui_extras",
  "gdl90",
@@ -1527,7 +1528,6 @@ dependencies = [
 [[package]]
 name = "xplm-egui"
 version = "0.5.0"
-source = "git+https://github.com/pcaracal/xplm-egui.git#3c7887d24a2ea4328d4c2fb46c868c4febcdd0e9"
 dependencies = [
  "anyhow",
  "bitflags",
