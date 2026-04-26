@@ -29,3 +29,15 @@ macro_rules! fmt_uom {
         )
     };
 }
+
+pub trait DurationExt {
+    fn human(self) -> humantime::FormattedDuration
+    where
+        Self: Sized;
+}
+
+impl DurationExt for std::time::Duration {
+    fn human(self) -> humantime::FormattedDuration {
+        humantime::format_duration(self)
+    }
+}

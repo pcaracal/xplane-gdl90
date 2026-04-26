@@ -9,7 +9,7 @@ use uom::{
 };
 use xplm_egui::{egui_window::App, flight_loop::FlightLoop};
 
-use crate::{data::Datarefs, fmt_uom, socket::Socket, state::State};
+use crate::{data::Datarefs, fmt_uom, socket::Socket, state::State, util::DurationExt};
 
 #[allow(unused)]
 #[derive(Builder)]
@@ -43,7 +43,7 @@ impl App for EguiApp {
             if let Some(target) = self.state.target.get() {
                 self.input.target = target.to_string();
             }
-            self.input.interval = humantime::format_duration(self.state.interval.get()).to_string();
+            self.input.interval = self.state.interval.get().human().to_string();
         }
 
         let error_color = ui.style().visuals.error_fg_color;
@@ -97,7 +97,7 @@ impl App for EguiApp {
                                 if dur < State::MINIMUM_INTERVAL {
                                     self.input.interval_warning = Some(format!(
                                         "Too low, using {}",
-                                        humantime::format_duration(State::MINIMUM_INTERVAL)
+                                        State::MINIMUM_INTERVAL.human()
                                     ));
                                     old_interval =
                                         self.state.interval.replace(State::MINIMUM_INTERVAL);
@@ -112,7 +112,7 @@ impl App for EguiApp {
                                 old_interval = self.state.interval.replace(State::DEFAULT_INTERVAL);
                                 self.input.interval_error = Some(format!(
                                     "Error: {why}, using {}",
-                                    humantime::format_duration(State::MINIMUM_INTERVAL)
+                                    State::MINIMUM_INTERVAL.human()
                                 ));
                             }
                         }
