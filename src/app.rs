@@ -1,6 +1,6 @@
-use std::{cell::RefCell, net::SocketAddr, rc::Rc, str::FromStr};
+use std::{cell::RefCell, rc::Rc};
 
-use egui::{RichText, Widget};
+use egui::{RichText, TextStyle, Widget};
 use egui_extras::{Column, TableBuilder};
 #[allow(clippy::wildcard_imports)]
 use uom::{
@@ -11,26 +11,22 @@ use xplm_egui::{egui_window::App, flight_loop::FlightLoop};
 
 use crate::{
     data::Datarefs,
-    dataref_viewer::DatarefViewer,
     fmt_uom,
-    socket::Socket,
-    state::{State, UiTab},
+    socket::{Socket, SocketState},
+    state::State,
     util::DurationExt,
 };
 
 #[allow(unused)]
 #[derive(Builder)]
 pub struct EguiApp {
-    state: Rc<State>,
+    state: State,
     datarefs: Rc<Datarefs>,
     flight_loop: Rc<RefCell<FlightLoop>>,
     socket: Socket,
 
     #[builder(skip)]
     input: Input,
-
-    #[builder(skip)]
-    dataref_viewer: DatarefViewer,
 }
 
 #[derive(Default)]
@@ -48,12 +44,15 @@ struct Input {
 impl App for EguiApp {
     #[allow(clippy::too_many_lines)]
     fn ui(&mut self, ui: &mut egui::Ui, _: &xplm_egui::window::Window) {
+        ui.set_zoom_factor(1.5);
+        ui.style_mut().override_text_style = Some(TextStyle::Monospace);
+
         if !self.input.init {
             self.input.init = true;
-            if let Some(target) = self.state.target.get() {
+            if let Some(target) = self.state.borrow().socket.target {
                 self.input.target = target.to_string();
             }
-            self.input.interval = self.state.interval.get().human().to_string();
+            self.input.interval = self.state.borrow().socket.interval.human().to_string();
         }
 
         let error_color = ui.style().visuals.error_fg_color;
@@ -66,98 +65,46 @@ impl App for EguiApp {
         } else {
             None
         };
-        let mut old_tab = self.state.tab.get();
-        let mut old_target = self.state.target.get();
-        let mut old_interval = self.state.interval.get();
 
         egui::CentralPanel::default_margins().show_inside(ui, |ui| {
             ui.vertical(|ui| {
-                ui.with_layout(
-                    egui::Layout::left_to_right(egui::Align::TOP)
-                        .with_cross_justify(false)
-                        .with_main_wrap(false),
-                    |ui| {
-                        for tab in [UiTab::Config, UiTab::DatarefViewer] {
-                            if ui
-                                .selectable_label(old_tab == tab, format!("{tab:?}"))
-                                .clicked()
-                            {
-                                old_tab = self.state.tab.replace(tab);
-                            }
-                        }
-                    },
-                );
-
-                if self.state.tab.get() == UiTab::DatarefViewer {
-                    self.dataref_viewer.ui(ui, &self.state);
-                    return;
+                ui.label("Send interval");
+                egui::TextEdit::singleline(&mut self.input.interval)
+                    .hint_text("Example: 100ms")
+                    .text_color_opt(interval_color)
+                    .ui(ui);
+                if let Some(error) = self
+                    .input
+                    .interval_error
+                    .as_ref()
+                    .or(self.input.interval_warning.as_ref())
+                {
+                    ui.colored_label(interval_color.unwrap_or(error_color), error);
                 }
 
-                ui.horizontal_wrapped(|ui| {
-                    if egui::TextEdit::singleline(&mut self.input.target)
-                        .hint_text("192.168.1.1:4000")
-                        .text_color_opt(target_color)
-                        .ui(ui)
-                        .changed()
-                    {
-                        match SocketAddr::from_str(&self.input.target) {
-                            Ok(addr) => {
-                                old_target = self.state.target.replace(Some(addr));
-                                self.input.target_error = None;
-                            }
-                            Err(why) => {
-                                old_target = self.state.target.replace(None);
-                                self.input.target_error = Some(why.to_string());
-                            }
-                        }
-                    }
+                ui.label("Target address");
+                egui::TextEdit::singleline(&mut self.input.target)
+                    .hint_text("Example: 192.168.1.1:4000")
+                    .text_color_opt(target_color)
+                    .ui(ui);
+                if let Some(error) = &self.input.target_error {
+                    ui.colored_label(error_color, error);
+                }
 
-                    if let Some(error) = &self.input.target_error {
-                        ui.label(RichText::new(error).color(error_color));
-                    }
-                });
+                for (addr, info) in &self.state.borrow().socket.auto_targets {
+                    ui.horizontal(|ui| {
+                        ui.add_enabled(false, egui::TextEdit::singleline(&mut addr.to_string()));
+                        ui.label(format!(
+                            "{} ({:.1}s ago)",
+                            info.app,
+                            info.time.elapsed().as_secs_f32()
+                        ));
+                    });
+                }
 
-                ui.horizontal_wrapped(|ui| {
-                    if egui::TextEdit::singleline(&mut self.input.interval)
-                        .hint_text("1s")
-                        .text_color_opt(interval_color)
-                        .ui(ui)
-                        .changed()
-                    {
-                        match humantime::parse_duration(&self.input.interval) {
-                            Ok(dur) => {
-                                if dur < State::MINIMUM_INTERVAL {
-                                    self.input.interval_warning = Some(format!(
-                                        "Too low, using {}",
-                                        State::MINIMUM_INTERVAL.human()
-                                    ));
-                                    old_interval =
-                                        self.state.interval.replace(State::MINIMUM_INTERVAL);
-                                    self.input.interval_error = None;
-                                } else {
-                                    old_interval = self.state.interval.replace(dur);
-                                    self.input.interval_warning = None;
-                                    self.input.interval_error = None;
-                                }
-                            }
-                            Err(why) => {
-                                old_interval = self.state.interval.replace(State::DEFAULT_INTERVAL);
-                                self.input.interval_error = Some(format!(
-                                    "Error: {why}, using {}",
-                                    State::MINIMUM_INTERVAL.human()
-                                ));
-                            }
-                        }
-                    }
-
-                    if let Some(warning) = &self.input.interval_warning {
-                        ui.label(RichText::new(warning).color(ui.style().visuals.warn_fg_color));
-                    }
-
-                    if let Some(error) = &self.input.interval_error {
-                        ui.label(RichText::new(error).color(ui.style().visuals.error_fg_color));
-                    }
-                });
+                ui.checkbox(&mut self.state.borrow_mut().heartbeat, "Heartbeat");
+                ui.checkbox(&mut self.state.borrow_mut().ownship, "Ownship");
+                ui.checkbox(&mut self.state.borrow_mut().ahrs, "AHRS");
 
                 let data = self.datarefs.data();
 
@@ -219,21 +166,37 @@ impl App for EguiApp {
             });
         });
 
-        let tab = old_tab != self.state.tab.get();
-        let t = old_target != self.state.target.get();
-        let i = old_interval != self.state.interval.get();
-        if tab || t || i {
-            if t {
-                self.socket.set_target(self.state.target.get());
+        if self.input.target.is_empty() {
+            self.state.borrow_mut().socket.target = None;
+            self.input.target_error = None;
+        } else {
+            match self.input.target.parse() {
+                Ok(target) => {
+                    self.state.borrow_mut().socket.target.replace(target);
+                    self.input.target_error = None;
+                }
+                Err(why) => {
+                    self.input.target_error = Some(why.to_string());
+                }
             }
+        }
 
-            if i {
-                self.flight_loop
-                    .borrow_mut()
-                    .schedule_after(self.state.interval.get());
+        match humantime::parse_duration(&self.input.interval) {
+            Ok(i) => {
+                if i < SocketState::MINIMUM_INTERVAL {
+                    self.input.interval_warning = Some(format!(
+                        "Too low, using {}",
+                        SocketState::MINIMUM_INTERVAL.human()
+                    ));
+                } else {
+                    self.input.interval_warning = None;
+                }
+                self.input.interval_error = None;
+                self.state.borrow_mut().socket.interval = i.max(SocketState::MINIMUM_INTERVAL);
             }
-
-            self.state.save();
+            Err(why) => {
+                self.input.interval_error = Some(why.to_string());
+            }
         }
     }
 }

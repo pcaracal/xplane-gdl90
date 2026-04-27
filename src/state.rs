@@ -1,40 +1,55 @@
-use std::{cell::Cell, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    path::PathBuf,
+    rc::Rc,
+};
 
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::PLUGIN_FOLDER;
+use crate::{PLUGIN_FOLDER, socket::SocketState};
 
 const STATE_FILE: &str = "state.ron";
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Builder)]
-pub struct State {
-    #[builder(skip(ctor))]
-    pub target: Cell<Option<SocketAddr>>,
-    #[builder(skip(ctor), default = Self::DEFAULT_INTERVAL.into())]
-    pub interval: Cell<Duration>,
-    #[builder(skip(ctor))]
-    pub tab: Cell<UiTab>,
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct State(Rc<RefCell<StateInner>>);
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StateInner {
+    pub socket: SocketState,
+
+    pub heartbeat: bool,
+    pub ownship: bool,
+    pub ahrs: bool,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum UiTab {
-    #[default]
-    Config,
-    DatarefViewer,
+impl Default for StateInner {
+    fn default() -> Self {
+        Self {
+            socket: SocketState::default(),
+            heartbeat: true,
+            ownship: true,
+            ahrs: true,
+        }
+    }
 }
 
 impl State {
-    pub const DEFAULT_INTERVAL: Duration = Duration::from_secs(1);
-    pub const MINIMUM_INTERVAL: Duration = Duration::from_millis(10);
+    pub fn borrow(&self) -> Ref<'_, StateInner> {
+        self.0.borrow()
+    }
+
+    pub fn borrow_mut(&self) -> RefMut<'_, StateInner> {
+        self.0.borrow_mut()
+    }
 
     #[must_use]
     pub fn load() -> Self {
         match Self::load_file() {
-            Ok(state) => state,
+            Ok(state) => Self(Rc::new(state.into())),
             Err(why) => {
                 error!("Failed to load state: {why}");
-                Self::new()
+                Self::default()
             }
         }
     }
@@ -52,7 +67,7 @@ impl State {
             .join(STATE_FILE))
     }
 
-    fn load_file() -> anyhow::Result<Self> {
+    fn load_file() -> anyhow::Result<StateInner> {
         let s = std::fs::read_to_string(Self::state_path()?)?;
         ron::from_str(&s).map_err(Into::into)
     }
@@ -60,7 +75,7 @@ impl State {
     fn save_file(&self) -> anyhow::Result<()> {
         std::fs::write(
             Self::state_path()?,
-            ron::ser::to_string_pretty(self, PrettyConfig::default())?,
+            ron::ser::to_string_pretty(&*self.0.borrow(), PrettyConfig::default())?,
         )
         .map_err(Into::into)
     }

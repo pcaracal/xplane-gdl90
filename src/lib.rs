@@ -3,7 +3,6 @@
 
 mod app;
 mod data;
-mod dataref_viewer;
 mod flight_loop;
 mod socket;
 mod state;
@@ -15,7 +14,7 @@ extern crate log;
 extern crate utilities_derive;
 extern crate xplm_egui;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use xplm_egui::{
     debugln,
@@ -35,10 +34,10 @@ use crate::{
 
 pub const PLUGIN_FOLDER: &str = "xplane-gdl90";
 
+#[allow(unused)]
 struct GDL90Plugin {
-    #[allow(unused)]
     menu: Menu,
-    state: Rc<State>,
+    state: State,
     flight_loop: Rc<RefCell<FlightLoop>>,
 }
 
@@ -61,9 +60,8 @@ impl Plugin for GDL90Plugin {
             debugln!("Failed to initialize log: {why}");
         }
 
-        let state = Rc::new(State::load());
-        let socket = Socket::new()?;
-        socket.set_target(state.target.get());
+        let state = State::load();
+        let socket = Socket::new(state.clone())?;
 
         let datarefs = Rc::new(Datarefs::new()?);
         let flight_loop = Rc::new(RefCell::new(FlightLoop::new(FlightLoopHandler::new(
@@ -96,16 +94,15 @@ impl Plugin for GDL90Plugin {
 
     fn enable(&mut self) -> Result<(), Self::Error> {
         info!("Enabling plugin");
-
         self.flight_loop
             .borrow_mut()
-            .schedule_after(self.state.interval.get().max(State::MINIMUM_INTERVAL));
-
+            .schedule_after(Duration::from_millis(10));
         Ok(())
     }
 
     fn disable(&mut self) {
         info!("Disabling plugin");
+        self.state.save();
         self.flight_loop.borrow_mut().deactivate();
     }
 }
@@ -121,7 +118,7 @@ impl Drop for GDL90Plugin {
 enum ToggleWindow {
     Initialized(EguiWindow),
     Uninitialized {
-        state: Rc<State>,
+        state: State,
         datarefs: Rc<Datarefs>,
         flight_loop: Rc<RefCell<FlightLoop>>,
         socket: Socket,
