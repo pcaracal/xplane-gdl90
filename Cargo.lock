@@ -1580,6 +1580,7 @@ dependencies = [
 [[package]]
 name = "xplm-egui"
 version = "0.5.0"
+source = "git+https://github.com/pcaracal/xplm-egui.git#85d23bc91810b6e427a1bda19b6bd4d1003e33cc"
 dependencies = [
  "anyhow",
  "bitflags",
