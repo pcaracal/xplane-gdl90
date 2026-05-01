@@ -141,6 +141,8 @@ impl Socket {
             .with_heading(data.true_hdg)
             .with_heading_type(AHRSHeadingType::True);
 
+        let precise = CustomPreciseOwnship::new(data.lat, data.lon, data.alt, data.gs);
+
         let mut bytes = Vec::new();
         if self.state.borrow().heartbeat {
             bytes.extend_from_slice(&heartbeat.into_gdl90_bytes()?);
@@ -150,6 +152,9 @@ impl Socket {
         }
         if self.state.borrow().ahrs {
             bytes.extend_from_slice(&ahrs.into_gdl90_bytes()?);
+        }
+        if self.state.borrow().precise {
+            bytes.extend_from_slice(&precise.into_gdl90_bytes()?);
         }
 
         if !self.socket.broadcast()? {

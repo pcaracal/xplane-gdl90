@@ -5,16 +5,16 @@ edition = "2024"
 
 [profile.release]
 opt-level = 3
-lto = true
+# lto = true # +10s compile time
 incremental = true
-codegen-units = 1
+# codegen-units = 1 # +5s compile time
 strip = "symbols"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-gdl90 = { git = "https://github.com/pcaracal/gdl90.git", version = "0.1.0" }
+gdl90 = { git = "https://github.com/pcaracal/gdl90.git" }
 # xplm-egui = { git = "https://github.com/pcaracal/xplm-egui.git", version = "0.5.0" }
 xplm-egui = { path = "../xplm-egui" }
 egui_extras = "0.34.1"

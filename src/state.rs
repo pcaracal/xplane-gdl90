@@ -15,12 +15,14 @@ const STATE_FILE: &str = "state.ron";
 pub struct State(Rc<RefCell<StateInner>>);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct StateInner {
     pub socket: SocketState,
 
     pub heartbeat: bool,
     pub ownship: bool,
     pub ahrs: bool,
+    pub precise: bool,
 }
 
 impl Default for StateInner {
@@ -30,6 +32,7 @@ impl Default for StateInner {
             heartbeat: true,
             ownship: true,
             ahrs: true,
+            precise: true,
         }
     }
 }

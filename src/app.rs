@@ -105,6 +105,7 @@ impl App for EguiApp {
                 ui.checkbox(&mut self.state.borrow_mut().heartbeat, "Heartbeat");
                 ui.checkbox(&mut self.state.borrow_mut().ownship, "Ownship");
                 ui.checkbox(&mut self.state.borrow_mut().ahrs, "AHRS");
+                ui.checkbox(&mut self.state.borrow_mut().precise, "Precise Ownship");
 
                 let data = self.datarefs.data();
 
