@@ -16,8 +16,8 @@ crate-type = ["cdylib"]
 [dependencies]
 gdl90 = { git = "https://github.com/pcaracal/gdl90.git" }
 xplm-egui = { git = "https://github.com/pcaracal/xplm-egui.git" }
-egui_extras = "0.34.1"
-egui = "0.34.1"
+egui_extras = "0.34.2"
+egui = "0.34.2"
 uom = { version = "0.38.0", features = ["autoconvert"] }
 num = "0.4.3"
 anyhow = "1.0.102"
