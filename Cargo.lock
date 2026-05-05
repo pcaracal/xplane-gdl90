@@ -1601,7 +1601,7 @@ dependencies = [
 [[package]]
 name = "xplm-sys"
 version = "4.3.0"
-source = "git+https://github.com/pcaracal/xplm-sys.git#58c977e62d32389f7e2d9a3f4a17db60df8ad4e1"
+source = "git+https://github.com/pcaracal/xplm-sys.git#f5b3a43d7e571a53b011e30a56d1613a778397c2"
 dependencies = [
  "bindgen",
 ]
